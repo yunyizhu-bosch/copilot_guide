@@ -24,6 +24,12 @@
 ### 料号
 - **解释**：博世的10位产品编号，由数字或者数字+大写字母构成
 - **可能有的其他名字**: 10位号，PN, SNR,博世号
+- **料号的属性描述**:
+- `ProductKey`: 6位数字的零部件类型ID，首位有可能是0。相同ProductKey的料号通常是同一类型的零部件。
+
+### TMM
+- **解释**: 全称是Technical Material Master，是博世内部一个记录了所有料号的属性（例如ProductKey、OE号、状态）的系统。FAS系统和spiderB系统里料号相关的数据都是从TMM系统里同步过来的。
+- **可能有的其他名字**: ViTTA
 
 ### 力洋
 - **解释**: 博世汽车售后中国的数据供应商，提供了车型的基本信息、OE号等数据
@@ -49,16 +55,24 @@
 ---
 
 ## 数据表定义
-### 表1: `CN FAS coverage tracking file`
-- **描述**: 记录了FAS里中国和台湾的车型连了哪些料号
-- **数据格式**：Excel
-- **地址**： `\\bosch.com\Dfsrb\DfsSG\DIV\AA\98_Shared\05_MBL-APS\Coverage Assistant & Tracking\CN\February\Tracking File`。该目录底下有多个文件，每个文件对应一条产品线，可以通过文件名区分。例如 `Battery_Tracking_File.xlsx`对应了电池产品线的覆盖数据。如果不确定要使用的文件具体是什么名字，可以通过os.listdir()来列出目录下的所有文件，找到对应的文件。
+### 表1: `FAS application data`
+- **描述**: 记录了FAS里车型在不同国家或地区和博世料号的适配关系以及相关的保有量数据。这个表的数据是从FAS系统里导出的，仅包含部分产品线的数据。包含了所有APAC的国家和地区。
+- **数据格式**：sql server表格
+- **地址**： 新加坡数据库 `DB_APSAnalyticsWorkbench_SQL` 中的 `kb.SCANex_REPORT_2_SC` 视图
 - **字段**:
-    - `FAS_KEY` (str, 联合主键): FAS中车型的唯一标识。
-    - `LAND` (str,联合主键): 国家或地区标识，PRC表示中国，RC表示台湾。
-    - `MATERIAL` (str,联合主键): 博世料号，如果这个车没有关联料号，则为空。如果这个车关联了多个博世料号，则每个料号一行。
-    - `RELEVANT_POPULATION` (DECIMAL): FAS_KEY在相应地区的保有量。
-    - `Product Key` (str): 表示零部件类型的ID, 由6位数字构成，首位有可能是0。如果这个车没有关联料号，则为空。
+- `BRAND` (str, 联合主键): FAS中车型品牌代码，由2-3位字母。
+- `NR` (str,联合主键): FAS中车型编号，由数字构成。完整的FAS_KEY由BRAND和NR组成，如果NR短于7位需要自行在前面补零以构成完整的FAS_KEY。比如BRAND是MB，NR是23456，那么完整的FAS_KEY应该是MB0023456。
+- `LAND` (str,联合主键): 国家或地区标识，`PRC`表示中国，`RC`表示台湾,`J`代表日本，其他国家或地区也有相应的代码。
+- `LAND_NAME` (str): 国家或地区名称。
+- `PRODUCT`(str,联合主键):产品线名称，例如`Wiper (front)`,`Brake Pad front`,`Cabin-Filter`,`Oil-Filter`,`Battery`,`Air Filter`,`Brake Pad rear`,`Brake Disc front`,`Spark-Plug`,`Brake Disc rear`,`O2 Sensor`,`Ignition Coil`,`Fuel-Filter`,
+`Wiper (rear)`,`Fuel Pump`,
+- `ESCHL` (str,联合主键): 也就是ProductKey,表示零部件类型的ID, 由6位数字构成，首位有可能是0。如果这个车没有关联料号，则为空。
+- `MATERIAL` (str,联合主键): 博世料号，如果这个FAS_KEY在这个国家没有关联这个产品线的料号，则为空。如果这个车关联了多个博世料号，则每个料号一行。
+- `RG_POPULATION` (str): 使用前需要把数据类型转化成float。该FAS_KEY在该国家或地区的保有量。不同国家和地区的保有量时效性不一样，对于中国而言，RG_POPULATION是截止到前年年底的保有量。
+- `RELEVANT_POPULATION` (str): 使用前需要把数据类型转化成float。对于某条产品线，该FAS_KEY在该国家或地区原车配备了该产品线的保有量。如果该FAS_KEY在该国家、该产品线没有连产品或者只连了一个产品，则RELEVANT_POPULATION为RG_POPULATION；如果连了多个产品，则把RG_POPULATION分配到每个产品，使得同一个FAS_KEY、同一个国家、同一个PRODUCT下的RELEVANT_POPULATION的和等于该FAS_KEY在该国家的RG_POPULATION。
+- `COVERED_POPULATION` (str): 使用前需要把数据类型转化成float。对于某条产品线，该FAS_KEY在该国家或地区可以适配博世产品的保有量。如果一个这一行关联了博世料号，则COVERED_POPULATION等于RELEVANT_POPULATION；如果一个FAS_KEY没有关联任何博世料号，则COVERED_POPULATION为0。
+
+   
 
 ### 表2：`spiderB vehicle master data`
 - **描述**: 记录了spiderB系统里车型的基本信息，包括车型名称、车型代码、生产年份等。
@@ -117,8 +131,8 @@ on t1.KFZMAR = t2.Brand_code
 - **数据格式**：parquet
 - **地址**： `\\bosch.com\DfsRb\DfsCN\LOC\Sgh\AA\Department\AA_MBL_CN\05_Data\02_Market Data\14_SpiderB\PRCsnapshot\0_latest\ods_spiderb_sys_car_mapping.parquet`
 - **字段**:
-- `bosch_id`(str,外键): `spiderB vehicle master data`表中的bosch_id，spiderB系统中车型的唯一标识。
-- `fas_key`(str,外键): FAS系统中车型的唯一标识。
+- `bosch_id`(str,外键，联合主键): `spiderB vehicle master data`表中的bosch_id，spiderB系统中车型的唯一标识。
+- `fas_key`(str,外键，联合主键): FAS系统中车型的唯一标识。
 - `is_deleted`(str): 这条记录是否被删除，'1'表示已删除，'0'表示未删除。只有'0'的记录才是有效的。
 
 ### 表5:`FAS VIO data`
@@ -133,6 +147,61 @@ from aavm.V_YMTK00135
 - `fas_key`(str,外键，联合主键): FAS系统中车型的唯一标识。
 - `land`(str，联合主键): 国家或地区标识，常见的有PRC表示中国，RC表示台湾，J代表日本。
 - `vio`(int): FAS_KEY在相应国家或地区的保有量。
+
+### 表6:`spiderB vio data`
+- **描述**: 记录了spiderB系统中车型在中国（PRC）。
+- **数据格式**：parquet
+- **地址**： `\\bosch.com\DfsRb\DfsCN\LOC\Sgh\AA\Department\AA_MBL_CN\05_Data\02_Market Data\14_SpiderB\PRCsnapshot\0_latest\ods_spiderb_sys_main_vehicle_population.parquet`
+- **字段**:
+- `bosch_id`(str,外键和主键): `spiderB vehicle master data`表中的bosch_id，spiderB系统中车型的唯一标识。
+- `population`(str): 该BoschID在中国（PRC）的截止到前年年底的保有量，也就是上传到FAS的保有量。使用前需要把数据类型转化成float。
+- `population_2018 `(str): 该BoschID在中国（PRC）截止到上个月的保有量，也就是最新的保有量。使用前需要把数据类型转化成float。
+- `is_deleted`(str): 这条记录是否被删除，'1'表示已删除，'0'表示未删除。只有'0'的记录才是有效的。
+
+### 表7:`spiderB application data`
+- **描述**: 记录了spiderB系统里车型在中国(PRC)和博世料号的适配关系。这个表的数据是从spiderB系统里导出的，仅包含中国（PRC）的数据。仅包含部分产品线的数据
+- **数据格式**：parquet
+- **地址**： `\\bosch.com\DfsRb\DfsCN\LOC\Sgh\AA\Department\AA_MBL_CN\05_Data\02_Market Data\14_SpiderB\PRCsnapshot\0_latest\dw_application.parquet`
+- **字段**:
+- `bosch_id`(str,外键,联合主键): `spiderB vehicle master data`表中的bosch_id，spiderB系统中车型的唯一标识。
+- `product_line`(str,外键，联合主键): spiderB中产品线的编号。
+- `product_line_name`(str): 产品线名称，和`product_line`一一对应。例如`Wiper`,`Brake pad fr`,`Cabin filter`,`Oil filter`,`Battery`,`Air filter`,`Brake pad rr`,`Brake disk fr`,`Spark plug`,`Lambda sensor`,`Ignition coil`,`Fuel filter`
+- `product_key`(str,外键，联合主键): 也就是ProductKey,表示零部件类型的ID, 由6位数字构成，首位有可能是0。如果这个车没有关联料号，则为空。
+- `product_number`(str,外键，联合主键): 博世料号，如果这个BoschID在这个产品线没有关联任何料号，则为空。如果这个BoschID关联了多个博世料号，则每个料号一行。
+- `oe_number`(str,联合主键): 原厂号码，如果这个BoschID在这个产品线没有关联任何原厂号码，则为空。如果这个BoschID关联了多个原厂号码，则每个号码一行。如果某一行的product_number和oe_number都不为空，表示这个车的这个产品线是根据这个原厂号码匹配的；如果某一行的product_number不为空但oe_number为空，表示这个车的这个产品线是根据其他信息（例如车型、发动机型号等）匹配的；如果某一行的product_number为空但oe_number不为空，表示这个车的没有基于这个oe号关联博世产品。
+- `oe_status`(str): OE号状态。'OE new'表示这个车的这个OE号码是新增的；'OE Deleted'表示这个车的这个OE号码被删除了。
+
+### 表8：`spiderB product key info`
+- **描述**: 记录了spiderB系统里所有的ProductKey以及对应的产品线信息。这个表的数据是从spiderB系统里导出的。仅包含部分的博世产品线的数据。
+- **数据格式**：parquet
+- **地址**： `\\bosch.com\DfsRb\DfsCN\LOC\Sgh\AA\Department\AA_MBL_CN\05_Data\02_Market Data\14_SpiderB\PRCsnapshot\0_latest\ods_spiderb_sys_productkey.parquet`
+- **字段**:
+- `product_key`(str,主键): 也就是ProductKey,表示零部件类型的ID, 由6位数字构成，首位有可能是0。
+- `en_name`(str): product_key的英文名称。
+- `appdes`(str):product_key的中文名称.
+- `product_line`(str): spiderB中产品线的编号
+- `is_deleted`(str): 这条记录是否被删除，'1'表示已删除，'0'表示未删除。只有'0'的记录才是有效的。
+
+### 表9：`spiderB product number info`
+- **描述**: 记录了spiderB系统里所有的博世料号以及对应的产品信息。这个表的数据是从spiderB系统里导出的。仅包含部分的博世产品线的数据。
+- **数据格式**：parquet
+- **地址**： `\\bosch.com\DfsRb\DfsCN\LOC\Sgh\AA\Department\AA_MBL_CN\05_Data\02_Market Data\14_SpiderB\PRCsnapshot\0_latest\ods_spiderb_sys_product.parquet`
+- **字段**:
+- `product_number`(str,主键): 博世料号
+- `product_key`(str,外键): 也就是ProductKey,表示零部件类型的ID, 由6位数字构成，首位有可能是0。注意这是产品在TMM系统里的product key。大部分情况下，`FAS application data`以及`spiderB application data`表格里的product key需要和TMM product key一样，但是也有可能不一样。比如33970160LX这个料号在TMM系统里的product key是186504，表示容翼pro雨刮片单支装，但是在application data里这个料号的product key是186501或者186502，表示容翼Pro单支装（主驾）和容翼Pro单支装（副驾）。
+- `product_line`(str,外键): spiderB中产品线的编号，和`spiderB product key info`表中的product_line是一一对应的关系。
+- `is_deleted`(str): 这条记录是否被删除，'1'表示已删除，'0'表示未删除。只有'0'的记录才是有效的。
+
+
+### 表10：`spiderB product line info`
+- **描述**: 记录了spiderB系统里所有的产品线信息。这个表的数据是从spiderB系统里导出的。仅包含部分的博世产品线的数据。
+- **数据格式**：parquet 
+- **地址**： `\\bosch.com\DfsRb\DfsCN\LOC\Sgh\AA\Department\AA_MBL_CN\05_Data\02_Market Data\14_SpiderB\PRCsnapshot\0_latest\ods_spiderb_sys_productline.parquet`
+- **字段**:
+- `product_line`(str,主键): spiderB中产品线的编号。
+- `name`(str): 产品线名称，和`spiderB application data`表中的product_line_name是一一对应的关系。例如`Wiper`,`Brake pad fr`,`Cabin filter`,`Oil filter`,`Battery`,`Air filter`,`Brake pad rr`,`Brake disk fr`,`Spark plug`,`Lambda sensor`,`Ignition coil`,`Fuel filter`
+- `is_deleted`(str): 这条记录是否被删除，'1'表示已删除，'0'表示未删除。只有'0'的记录才是有效的。
+
 
 
 ## 常见输出模板
