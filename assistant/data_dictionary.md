@@ -6,7 +6,7 @@
 ## 公司和行业术语
 
 ### FAS
-- **解释**: 博世汽车售后德国总部的数据系统，主要内容是全球的车型、保有量、OE号以及适配数据
+- **解释**: 博世汽车售后德国总部的数据系统，主要内容是全球的车型、保有量、OE号以及适配数据、产品主数据
 - **可能有的其他名字**: KP1
 
 ### FAS_KEY
@@ -19,7 +19,7 @@
 - **解释**: WAVE系统中车型的唯一标识，由FAS_KEY中的品牌代码+'_'+FAS_KEY中的车型编号去掉开头的0构成。WAVE_KEY和FAS_KEY是一一对应的关系，比如FAS_KEY `MB0023456`对应的WAVE_KEY是`MB_23456`。
 
 ### spiderB
-- **解释**: 博世汽车售后中国事业部用的适配关系管理系统，主要内容是全球的车型、保有量、OE号以及适配数据
+- **解释**: 博世汽车售后中国事业部用的适配关系管理系统，主要内容是中国的车型、保有量、OE号以及适配数据
 
 ### 料号
 - **解释**：博世的10位产品编号，由数字或者数字+大写字母构成
@@ -38,7 +38,8 @@
 - **解释**: PC代表乘用车, LCV代表轻型商用车, HCV代表重型商用车。这是汽车类型的分类标准，通常在FAS系统的class字段里可以找到这个信息。
 
 ---
-## 数据库以及链接方式
+
+## 数据源连接
 
 ### SMS数据库
 - **类型**: MS SQL Server 
@@ -64,16 +65,12 @@
 - `NR` (str,联合主键): FAS中车型编号，由数字构成。完整的FAS_KEY由BRAND和NR组成，如果NR短于7位需要自行在前面补零以构成完整的FAS_KEY。比如BRAND是MB，NR是23456，那么完整的FAS_KEY应该是MB0023456。
 - `LAND` (str,联合主键): 国家或地区标识，`PRC`表示中国，`RC`表示台湾,`J`代表日本，其他国家或地区也有相应的代码。
 - `LAND_NAME` (str): 国家或地区名称。
-- `PRODUCT`(str,联合主键):产品线名称，例如`Wiper (front)`,`Brake Pad front`,`Cabin-Filter`,`Oil-Filter`,`Battery`,`Air Filter`,`Brake Pad rear`,`Brake Disc front`,`Spark-Plug`,`Brake Disc rear`,`O2 Sensor`,`Ignition Coil`,`Fuel-Filter`,
-`Wiper (rear)`,`Fuel Pump`,
+- `PRODUCT`(str,联合主键):产品线名称，例如`Wiper (front)`,`Brake Pad front`,`Cabin-Filter`,`Oil-Filter`,`Battery`,`Air Filter`,`Brake Pad rear`,`Brake Disc front`,`Spark-Plug`,`Brake Disc rear`,`O2 Sensor`,`Ignition Coil`,`Fuel-Filter`,`Wiper (rear)`,`Fuel Pump`,
 - `ESCHL` (str,联合主键): 也就是ProductKey,表示零部件类型的ID, 由6位数字构成，首位有可能是0。如果这个车没有关联料号，则为空。
 - `MATERIAL` (str,联合主键): 博世料号，如果这个FAS_KEY在这个国家没有关联这个产品线的料号，则为空。如果这个车关联了多个博世料号，则每个料号一行。
 - `RG_POPULATION` (str): 使用前需要把数据类型转化成float。该FAS_KEY在该国家或地区的保有量。不同国家和地区的保有量时效性不一样，对于中国而言，RG_POPULATION是截止到前年年底的保有量。
 - `RELEVANT_POPULATION` (str): 使用前需要把数据类型转化成float。对于某条产品线，该FAS_KEY在该国家或地区原车配备了该产品线的保有量。如果该FAS_KEY在该国家、该产品线没有连产品或者只连了一个产品，则RELEVANT_POPULATION为RG_POPULATION；如果连了多个产品，则把RG_POPULATION分配到每个产品，使得同一个FAS_KEY、同一个国家、同一个PRODUCT下的RELEVANT_POPULATION的和等于该FAS_KEY在该国家的RG_POPULATION。
-- `COVERED_POPULATION` (str): 使用前需要把数据类型转化成float。对于某条产品线，该FAS_KEY在该国家或地区可以适配博世产品的保有量。如果一个这一行关联了博世料号，则COVERED_POPULATION等于RELEVANT_POPULATION；如果一个FAS_KEY没有关联任何博世料号，则COVERED_POPULATION为0。
-
-   
-
+- `COVERED_POPULATION` (str): 使用前需要把数据类型转化成float。对于某条产品线，该FAS_KEY在该国家或地区可以适配博世产品的保有量。如果一个这一行关联了博世料号，则COVERED_POPULATION等于RELEVANT_POPULATION；如果一个FAS_KEY没有关联任何博世料号，则COVERED_POPULATION为0。  
 ### 表2：`spiderB vehicle master data`
 - **描述**: 记录了spiderB系统里车型的基本信息，包括车型名称、车型代码、生产年份等。
 - **数据格式**：parquet
@@ -210,14 +207,14 @@ from aavm.V_YMTK00135
 - **数据格式**：Excel
 - **sheet名**：`application.xlsx`
 - **字段**:
-- `is_delete` (int): 表示新增记录还是删除记录，1表示删除记录，0表示新增或者更新记录。
+- `is_delete` (int): 表示新增记录还是删除记录，'1'表示删除记录，'0'表示新增或者更新记录。
 - `BoschID` (str, 联合主键): 博世车型ID。
 - `ProductNumber` (str， 联合主键): 10位号。
 - `ProductKey` (str, 联合主键): 表示零部件类型的ID, 由6位数字构成，首位有可能是0。
-- `OE Number` (str): 车型和料号是根据哪个原厂号码匹配的，默认为空。
-- `Remark Internal` (str): 内部备注，默认为空。
-- `Remark External` (str): 外部备注，默认为空。
-- `Country` (str): 国家，默认为PRC。
-- `Specialcase` (str): FAS的系统能识别的备注，默认为空。
-- `Remark Internal - Local Language` (str): 没有用的字段，默认为空。
-- `Remark External - Local Language` (str): 没有用的字段，默认为空。
+- `OE Number` (str): 车型和料号是根据哪个原厂号码匹配的，默认为''。
+- `Remark Internal` (str): 内部备注，默认为''。
+- `Remark External` (str): 外部备注，默认为''。
+- `Country` (str): 国家，默认为'PRC'。
+- `Specialcase` (str): FAS的系统能识别的备注，默认为''。
+- `Remark Internal - Local Language` (str): 没有用的字段，默认为''。
+- `Remark External - Local Language` (str): 没有用的字段，默认为''。
