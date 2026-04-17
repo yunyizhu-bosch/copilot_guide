@@ -39,7 +39,7 @@
 
 ---
 
-## 数据源连接
+## 数据库及连接方式
 
 ### SMS数据库
 - **类型**: MS SQL Server 
@@ -65,7 +65,22 @@
 - `NR` (str,联合主键): FAS中车型编号，由数字构成。完整的FAS_KEY由BRAND和NR组成，如果NR短于7位需要自行在前面补零以构成完整的FAS_KEY。比如BRAND是MB，NR是23456，那么完整的FAS_KEY应该是MB0023456。
 - `LAND` (str,联合主键): 国家或地区标识，`PRC`表示中国，`RC`表示台湾,`J`代表日本，其他国家或地区也有相应的代码。
 - `LAND_NAME` (str): 国家或地区名称。
-- `PRODUCT`(str,联合主键):产品线名称，例如`Wiper (front)`,`Brake Pad front`,`Cabin-Filter`,`Oil-Filter`,`Battery`,`Air Filter`,`Brake Pad rear`,`Brake Disc front`,`Spark-Plug`,`Brake Disc rear`,`O2 Sensor`,`Ignition Coil`,`Fuel-Filter`,`Wiper (rear)`,`Fuel Pump`,
+- `PRODUCT`(str,联合主键): 产品线名称，例如：
+  - `Wiper (front)`
+  - `Brake Pad front`
+  - `Cabin-Filter`
+  - `Oil-Filter`
+  - `Battery`
+  - `Air Filter`
+  - `Brake Pad rear`
+  - `Brake Disc front`
+  - `Spark-Plug`
+  - `Brake Disc rear`
+  - `O2 Sensor`
+  - `Ignition Coil`
+  - `Fuel-Filter`
+  - `Wiper (rear)`
+  - `Fuel Pump`
 - `ESCHL` (str,联合主键): 也就是ProductKey,表示零部件类型的ID, 由6位数字构成，首位有可能是0。如果这个车没有关联料号，则为空。
 - `MATERIAL` (str,联合主键): 博世料号，如果这个FAS_KEY在这个国家没有关联这个产品线的料号，则为空。如果这个车关联了多个博世料号，则每个料号一行。
 - `RG_POPULATION` (str): 使用前需要把数据类型转化成float。该FAS_KEY在该国家或地区的保有量。不同国家和地区的保有量时效性不一样，对于中国而言，RG_POPULATION是截止到前年年底的保有量。
@@ -192,7 +207,7 @@ from aavm.V_YMTK00135
 
 ### 表10：`spiderB product line info`
 - **描述**: 记录了spiderB系统里所有的产品线信息。这个表的数据是从spiderB系统里导出的。仅包含部分的博世产品线的数据。
-- **数据格式**：parquet 
+- `is_delete` (int): 表示新增记录还是删除记录，1表示删除记录，0表示新增或者更新记录。
 - **地址**： `\\bosch.com\DfsRb\DfsCN\LOC\Sgh\AA\Department\AA_MBL_CN\05_Data\02_Market Data\14_SpiderB\PRCsnapshot\0_latest\ods_spiderb_sys_productline.parquet`
 - **字段**:
 - `product_line`(str,主键): spiderB中产品线的编号。
@@ -207,7 +222,7 @@ from aavm.V_YMTK00135
 - **数据格式**：Excel
 - **sheet名**：`application.xlsx`
 - **字段**:
-- `is_delete` (int): 表示新增记录还是删除记录，'1'表示删除记录，'0'表示新增或者更新记录。
+- `is_delete` (int): 表示新增记录还是删除记录，1表示删除记录，0表示新增或者更新记录。
 - `BoschID` (str, 联合主键): 博世车型ID。
 - `ProductNumber` (str， 联合主键): 10位号。
 - `ProductKey` (str, 联合主键): 表示零部件类型的ID, 由6位数字构成，首位有可能是0。
